@@ -18,4 +18,4 @@ results_opt_only/
 .ipynb_checkpoints/
 
 #csvs
-linearization/linearized_efficiency_test.csv
+Data/Frequency/*.csv
