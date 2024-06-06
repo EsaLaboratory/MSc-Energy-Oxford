@@ -86,3 +86,6 @@ class FrequencyProfile(pd.DataFrame):
         self.__dict__.update(self_resampled.__dict__)
 
         print('The data was resampled with a fixed offset of 3h. This means the first window starts on', self.index[0], 'and the last window starts on', self.index[-1])
+
+    def add_EAC_window_identifier(self):
+        self['EAC_window'] = (self.index.hour % 23 + 1) // 4
