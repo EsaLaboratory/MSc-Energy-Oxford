@@ -89,3 +89,38 @@ class FrequencyProfile(pd.DataFrame):
 
     def add_EAC_window_identifier(self):
         self['EAC_window'] = (self.index.hour % 23 + 1) // 4
+
+class AuctionData(pd.DataFrame):
+    
+    def __init__(self, data):
+        super().__init__(data)
+
+    def rearrange(self):
+        self['deliveryStart'] = pd.to_datetime(self['deliveryStart'])
+        # Create a pivot table
+        pivot_df = self.pivot_table(
+            index='deliveryStart',
+            columns='auctionProduct',
+            values='clearingPrice',
+            aggfunc='last'  # Use 'last' to get the last occurrence if there are duplicates
+        )
+        # Reset the index to make 'deliveryStart' a column again
+        pivot_df.reset_index(inplace=True)
+        # Update the original DataFrame in place
+        self.drop(self.index, inplace=True)
+        self.columns = pivot_df.columns
+        for col in pivot_df.columns:
+            self[col] = pivot_df[col]
+        self.index = pivot_df.index
+        
+        #rename the columns according to dict
+        col_dict = {
+            'deliveryStart': 'dtm',
+            'DRH': 'DR_High',
+            'DRL': 'DR_Low',
+            'DMH': 'DM_High',
+            'DML': 'DM_Low',
+            'DCH': 'DC_High',
+            'DCL': 'DC_Low'
+        }
+        self.rename(columns=col_dict, inplace=True)
