@@ -41,6 +41,8 @@ class BiddingSim():
         auction_data = pd.read_csv(self.__auction_data_path)
         auction_data = AuctionData(auction_data)
         auction_data.rearrange()
+
+        current_capacity_Wh = self.__capacity
         
         for day in range(self.__no_of_weeks*7):
 
@@ -56,50 +58,41 @@ class BiddingSim():
                                    'DM_high' : [0,0,0,0,0,0], 
                                    'DM_low' : [2,2,2,2,2,2]}
             
-            clearing_prices
+            clearing_prices = self.__extract_clearing_prices(auction_data, current_day_start)
+            print(clearing_prices)
             
             #check which bids are accepted and return resulting capacity allocation
-            capacity_allocation = self.__run_market(bids, offers)
-            
-            #check whether capacity allocation is valid
-            print(self.__capacity)
-
-            # Retrieve all lists from the dictionary values
-            allocations = capacity_allocation.values()
-            
-            # Flatten all lists into a single list
-            allocations_concat = [element for sublist in allocations for element in sublist]
-            
-            # Sum all elements in the flattened list
-            total_allocation = sum(allocations_concat)
-
-            if total_allocation > self.__capacity:
-                raise ValueError('Capacity allocation exceeds storage capacity')
-            
+            print('Running Market for day: ', day)
+            capacity_allocation_pu = self.__run_market(clearing_prices, bids)    
             
             #generate power demand profile based on the allocated capacities
-            power_demand = self.__generate_power_demand(frequency_profile.loc[(frequency_profile.index >= current_day_start) & 
-                                                        (frequency_profile.index < current_day_end)], capacity_allocation)
+            power_demand_W = self.__generate_power_demand(frequency_profile.loc[(frequency_profile.index >= current_day_start) & 
+                                                        (frequency_profile.index < current_day_end)], capacity_allocation_pu, current_capacity_Wh/2)
+
             
             #run the battery simulation tool with output powerdemand
             print('Running Battery Simulation for day: ', day)
-            fullfill, soc, capacity = self.__run_daily_battery_simulation(power_demand)
+            fullfill, soc, capacity_Wh = self.__run_daily_battery_simulation(power_demand_W)
             print('Fulfillment: ', fullfill)
             print('SOC: ', soc)
-            print('Capacity: ', capacity)
-            
+            print('Capacity: ', capacity_Wh)
+            current_capacity_Wh = capacity_Wh/1000
 
             
 
     #function that converts the daily frequency as well as a dictionary of capacity allocations for all services throughout the day
     #into a power demand profile which can then be used to feed into the battery simulation tool    
-    def __generate_power_demand(self, one_day_frequency, capacity_allocation):
+    def __generate_power_demand(self, one_day_frequency, capacity_allocation,current_capacity):
         # Initialize the power_demand DataFrame
         power_demand = pd.DataFrame(index=one_day_frequency.index, columns=['frequency', 'power_demand'])
         
         # Set the frequency column in one go
         power_demand['frequency'] = one_day_frequency['f']
         power_demand['power_demand'] = 0  # Initialize power_demand to 0
+
+        #multiply every value in the capacity allocation dictionary with the current_capacity
+        for key in capacity_allocation.keys():
+            capacity_allocation[key] = [x * current_capacity for x in capacity_allocation[key]]
         
         for key in capacity_allocation.keys():
             # Determine the adjustment based on whether 'low' is in the key
@@ -191,13 +184,28 @@ class BiddingSim():
         if m.status == GRB.OPTIMAL:
             for i in range(6):
                 allocations['DR_high'].append(allocation_DR[i].x)
-                allocations['DR_low'].append(allocation_DC[i].x)
-                allocations['DC_high'].append(allocation_DM[i].x)
-                allocations['DC_low'].append(allocation_DM[i].x)
+                allocations['DR_low'].append(allocation_DR[i].x)
+                allocations['DC_high'].append(allocation_DC[i].x)
+                allocations['DC_low'].append(allocation_DC[i].x)
                 allocations['DM_high'].append(allocation_DM[i].x)
                 allocations['DM_low'].append(allocation_DM[i].x)
 
         return allocations
+    
+    def __extract_clearing_prices(self,auction_data, day: pd.Timestamp):
+        '''
+        This function extracts the clearing prices for a given day and returns them in a dictionary
+        '''
+        clearing_prices = {'DR_high':[], 'DR_low':[], 'DC_high':[], 'DC_low':[], 'DM_high':[], 'DM_low':[]}
+        day_start = day
+        day_end = day + pd.Timedelta(days=1)
+        auction_data = auction_data.loc[(auction_data['dtm'] >= day_start) & (auction_data['dtm'] < day_end)]
+
+        for index,row in auction_data.iterrows():
+            for key in auction_data.columns[1:]:
+                clearing_prices[key].append(row[key])
+        
+        return clearing_prices
 
 
 if __name__ == '__main__':
