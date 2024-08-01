@@ -616,9 +616,6 @@ def optimizer_cyc_aging(hours, timestep_opt_s, epex_price_GBP_MWh,
                        DM_low_response, DR_high_response, DR_low_response,
                        aging_cost_GBP_per_cycle):
     
-    
-    print('Correct function used.')
-
     #initialize the gurobi model
     model = gp.Model('FFR_Maximize_Profit')
     model.setParam('OutputFlag',1)
@@ -637,9 +634,10 @@ def optimizer_cyc_aging(hours, timestep_opt_s, epex_price_GBP_MWh,
     power_tot = model.addVars(int(3600/timestep_opt_s*hours),lb = -max_power_MW, ub = max_power_MW, name = 'power')
     power_charge = model.addVars(int(3600/timestep_opt_s*hours),lb = 0, ub = max_power_MW, name = 'power')
     power_discharge = model.addVars(int(3600/timestep_opt_s*hours),lb = 0, ub = max_power_MW, name = 'power')
-    charge_status = model.addVars(int(3600/timestep_opt_s*hours), vtype = GRB.BINARY)
     cycles_opt = model.addVar(lb = 0, ub = 10,name = 'cycles')
     charge_status = model.addVars(int(3600/timestep_opt_s*hours), vtype = GRB.BINARY)
+    baseline_charge_status = model.addVars(hours*2, vtype = GRB.BINARY)
+    baseline_discharge_status = model.addVars(hours*2, vtype = GRB.BINARY)
 
     #add the objective function
     #calculate the value of the energy bought or sold through baselines --> division by two is to convert half hourly
@@ -660,9 +658,13 @@ def optimizer_cyc_aging(hours, timestep_opt_s, epex_price_GBP_MWh,
     model.setObjective(value_recharge_GBP + value_FFR_GBP -value_aging_GBP, GRB.MAXIMIZE)
 
     #--------------------CONSTRAINTS--------------------
-    #manage SOC evolution
+    # Constrain either baseline charge or baseline discharge to be non-zero
+    model.addConstrs(baseline_charge_status[i] + baseline_discharge_status[i] <= 1 for i in range(hours*2))
 
-    # Add power evolution constraint
+    model.addConstrs(baseline_charge[i]<= baseline_charge_status[i]* max_power_MW for i in range(hours*2))
+    model.addConstrs(baseline_discharge[i]<= baseline_discharge_status[i]* max_power_MW for i in range(hours*2))
+
+    # Add power evolution
     model.addConstrs(power_tot[i] == (baseline_charge[(i)//(1800/timestep_opt_s)] +
         DC_high_response[i] * capacity_allocation[((i)//(14400/timestep_opt_s))*6] +
         DM_high_response[i] * capacity_allocation[((i)//(14400/timestep_opt_s))*6+2] +
@@ -699,7 +701,7 @@ def optimizer_cyc_aging(hours, timestep_opt_s, epex_price_GBP_MWh,
     )
 
     # Add cycle variable constraint
-    model.addConstr(cycles_opt == gp.quicksum((-1+2*charge_status[i])*power_tot[i]/2/(capacity_MWh/0.9)/3600*timestep_opt_s for i in range(len(power_tot))))
+    model.addConstr(cycles_opt == gp.quicksum((power_charge[i] + power_discharge[i])/2/(capacity_MWh)/3600*timestep_opt_s for i in range(len(power_tot))))
 
     # Add maximum power constraints for charge in bulk
     model.addConstrs(
@@ -724,10 +726,10 @@ def optimizer_cyc_aging(hours, timestep_opt_s, epex_price_GBP_MWh,
     model.addConstrs((soc[i] >= 0 for i in range(len(soc))))
 
     #add soc constraint to comply with legal limits
-    model.addConstrs((soc[i*1800/timestep_opt_s] <= 1-(0.25*capacity_allocation[i//8]+0.5*capacity_allocation[i//8+2]+
-                    capacity_allocation[i//8+4])/capacity_MWh for i in range(hours*2)))
-    model.addConstrs((soc[i*1800/timestep_opt_s] >= (0.25*capacity_allocation[i//8+1]+0.5*capacity_allocation[i//8+3]+
-                    capacity_allocation[i//8+5])/capacity_MWh for i in range(hours*2)))
+    model.addConstrs((soc[i*1800/timestep_opt_s] <= 1-(0.25*capacity_allocation[(i//8)*6]+0.5*capacity_allocation[(i//8)*6+2]+
+                    capacity_allocation[(i//8)*6+4])/capacity_MWh for i in range(hours*2)))
+    model.addConstrs((soc[i*1800/timestep_opt_s] >= (0.25*capacity_allocation[(i//8)*6+1]+0.5*capacity_allocation[(i//8)*6+3]+
+                    capacity_allocation[(i//8)*6+5])/capacity_MWh for i in range(hours*2)))
 
     model.optimize()
 
@@ -770,10 +772,8 @@ def optimizer_cyc_aging(hours, timestep_opt_s, epex_price_GBP_MWh,
     soc_results = []
     for i in range(len(soc)):
         soc_results.append(soc[i].x)
-        if i > 0:
-            cycles += abs(soc_results[-1] - soc_results[-2])
     
-    return daily_profit_GBP, optimal_capacity_allocation_MW, optimal_baseline_charge_MW, optimal_baseline_discharge_MW, soc_results, cycles/2, cycles_opt.x
+    return daily_profit_GBP, optimal_capacity_allocation_MW, optimal_baseline_charge_MW, optimal_baseline_discharge_MW, soc_results, cycles_opt.x
 
 import sys
 
