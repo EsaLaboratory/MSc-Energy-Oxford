@@ -72,7 +72,7 @@ Before running a simulation, a few configurations can be made.
   - `optimization_optsim.ini`: Change inputs and parameters used by the optimization model
   - `simulation_optsim.ini`: Change inputs and parameters used for the battery model SimSES
     
-- Change the desired **output path** for the results by modifying the file path [here]()
+- Change the desired **output path** for the results by modifying the file path [here](https://github.com/EsaLaboratory/MSc-Energy-Oxford/blob/f2b4f679c9cac7d802c2b0e3ccc122a34f094f92/sim.py#L194)
 
 
 ## Data
