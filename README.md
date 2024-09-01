@@ -65,7 +65,7 @@ python sim.py
 ```
 Before running a simulation, a few configurations can be made.
 
-- Adjust the underlying **operational strategy** by changing the optimizer used in the model. Currently the following operational strategies are implemented: No Legal Limits `optimizer_no_limits`, Baseline `optimizer_no_aging`, Cycle Limit `optimizer_daily_lim`, Cycle Aging `optimizer_cyc_aging` and PL Aging `optimizer_pl_aging`. To change the operational strategy used, modify [this]() line to contain the desired optimizer function.
+- Adjust the underlying **operational strategy** by changing the optimizer used in the model. Currently the following operational strategies are implemented: No Legal Limits `optimizer_no_limits`, Baseline `optimizer_no_aging`, Cycle Limit `optimizer_daily_lim`, Cycle Aging `optimizer_cyc_aging` and PL Aging `optimizer_pl_aging`. To change the operational strategy used, modify [this](https://github.com/EsaLaboratory/MSc-Energy-Oxford/blob/f2b4f679c9cac7d802c2b0e3ccc122a34f094f92/sim.py#L120) line to contain the desired optimizer function.
   
 - Change the **configuration** by modifying the corresponding files located in the `configs/` folder:
   - `analysis_optsim.ini`: Required for SimSES tool but no need to change
