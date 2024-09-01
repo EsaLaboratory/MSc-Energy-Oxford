@@ -14,11 +14,17 @@ The aim of the project was to develop an MPC framework capable of analyzing agin
 
 ## Code Structure
 `sim.py`: Main file used to run the simulations
+
 `Data/`: Contains input data like Frequency, Price and Linearizations
+
 `Functions/`: Contains functions that help with the processing of the linearization coefficients
+
 `configs/`: Contains config files used to modify model parameters
+
 `optimizers/`: Contains the formalized aging-aware operating strategies
+
 `utils`: Contains auxiliary functions used to handle data
+
 `dependencies.txt`: Text file containing information to create the python environment
 
 ## Using the Model
